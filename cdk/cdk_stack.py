@@ -132,7 +132,16 @@ class CdkStack(Stack):
         bedrock_policy = iam.Policy(self, f"{prefix}BedrockPolicy",
                                     statements=[
                                         iam.PolicyStatement(
-                                            actions=["bedrock:InvokeModel"],
+                                            actions=[
+                                                "bedrock:GetAsyncInvoke",
+                                                "bedrock:InvokeModel",
+                                                "dynamodb:GetItem",
+                                                "dynamodb:PutItem",
+                                                "dynamodb:Scan",
+                                                "s3:GetObject",
+                                                "s3:PutObject",
+                                                "ssm:GetParameter"
+                                            ],
                                             resources=["*"]
                                         )
                                     ]
