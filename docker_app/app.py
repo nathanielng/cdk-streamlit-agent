@@ -103,11 +103,11 @@ def clear_bookings(table_name):
         )
 
 # ----- Streamlit UI -----
-st.title("Restaurant Booking Assistant")
+st.title("🍽️ Restaurant Booking Assistant")
 
 def update_sidebar():
     with st.sidebar:
-        st.header("Recent Bookings")
+        st.header("📋 Recent Bookings")
         recent_bookings = get_recent_bookings(table_name)
         if recent_bookings:
             for booking in recent_bookings:
@@ -119,18 +119,18 @@ def update_sidebar():
         else:
             st.write("No recent bookings found")
 
-        st.button("Clear Bookings", on_click=clear_bookings, args=(table_name,))
+        st.button("🗑️ Clear Bookings", on_click=clear_bookings, args=(table_name,))
 
 
 def main():
-    st.write("Enter your booking request")
+    st.write("✍️ Enter your booking request")
     query = st.text_area(
-        label="Include your name, number of people, date, and time:",
+        label="✨ Include your name, number of people, date, and time:",
         value="Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.",
         height=80
     )
 
-    if st.button("Submit"):
+    if st.button("📤 Submit"):
         with st.spinner('Processing your request...'):
             answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
             st.markdown(answer)
