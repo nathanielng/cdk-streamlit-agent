@@ -28,26 +28,114 @@ with st.sidebar:
     st.text(f"Welcome,\n{authenticator.get_username()}")
     st.button("Logout", "logout_btn", on_click=logout)
 
-# Add title on the page
-st.title("Generative AI Application")
+#!/usr/bin/env python
 
-# Ask user for input text
-input_sent = st.text_input("Input Sentence", "Say Hello World! in Spanish, French and Japanese.")
+# export AWS_DEFAULT_REGION="us-east-1"
+# streamlit run agent_streamlit_app.py --server.runOnSave True --server.port 8501
 
-# Create the large language model object
-llm = Llm(Config.BEDROCK_REGION)
+# curl -LO https://raw.githubusercontent.com/aws-samples/amazon-bedrock-workshop/refs/heads/main/05_Agents/agent.py
 
-# When there is an input text to process
-if input_sent:
-    # Invoke the Bedrock foundation model
-    response = llm.invoke(input_sent)
+import boto3
+import os
+import logging
+import json
+import uuid
+import streamlit as st
 
-    # Transform response to json
-    json_response = json.loads(response.get("body").read())
+from agent import invoke_agent_helper
 
-    # Format response and print it in the console
-    pretty_json_output = json.dumps(json_response, indent=2)
-    print("API response: ", pretty_json_output)
+# ----- Logging -----
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-    # Write response on Streamlit web interface
-    st.write("**Foundation model output** \n\n", json_response['completion'])
+# ----- Setup -----
+session_id = str(uuid.uuid1())
+logger.info(f"Session ID: {session_id}")
+
+# ----- SSM Setup -----
+ssm = boto3.client('ssm')
+agent_id = ssm.get_parameter(Name='/agents/AGENT_ID').get('Parameter').get('Value')
+alias_id = ssm.get_parameter(Name='/agents/ALIAS_ID').get('Parameter').get('Value')
+
+lambda_iam_role = ssm.get_parameter(Name='/agents/LAMBDA_IAM_ROLE').get('Parameter').get('Value')
+lambda_iam_role = json.loads(lambda_iam_role)
+
+agent_role = ssm.get_parameter(Name='/agents/AGENT_ROLE').get('Parameter').get('Value')
+agent_role = json.loads(agent_role)
+
+# lambda_function = json.loads(lambda_function)
+# agent_action_group_response = json.loads(agent_action_group_response)
+# agent_functions = json.loads(agent_functions)
+
+# agent_name = ssm.get_parameter(Name='/agents/AGENT_NAME').get('Parameter').get('Value')
+# suffix = ssm.get_parameter(Name='/agents/SUFFIX').get('Parameter').get('Value')
+# region = ssm.get_parameter(Name='/agents/REGION').get('Parameter').get('Value')
+# agent_foundation_model = ssm.get_parameter(Name='/agents/AGENT_FOUNDATION_MODEL').get('Parameter').get('Value')
+# account_id = ssm.get_parameter(Name='/agents/ACCOUNT_ID').get('Parameter').get('Value')
+# alias_id = ssm.get_parameter(Name='/agents/ALIAS_ID').get('Parameter').get('Value')
+# lambda_function = ssm.get_parameter(Name='/agents/LAMBDA_FUNCTION').get('Parameter').get('Value')
+# lambda_function_name = ssm.get_parameter(Name='/agents/LAMBDA_FUNCTION_NAME').get('Parameter').get('Value')
+# agent_action_group_response = ssm.get_parameter(Name='/agents/AGENT_ACTION_GROUP_RESPONSE').get('Parameter').get('Value')
+# agent_functions = ssm.get_parameter(Name='/agents/AGENT_FUNCTIONS').get('Parameter').get('Value')
+table_name = ssm.get_parameter(Name='/agents/TABLE_NAME').get('Parameter').get('Value')
+
+
+# ----- DynamoDB -----
+def get_recent_bookings(table_name):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(table_name)
+    response = table.scan(
+        Limit=3
+    )
+    items = response.get('Items', [])
+    return items
+
+def clear_bookings(table_name):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(table_name)
+    response = table.scan()
+    items = response.get('Items', [])
+    for item in items:
+        table.delete_item(
+            Key={
+                'booking_id': item['booking_id']
+            }
+        )
+
+# ----- Streamlit UI -----
+st.title("Restaurant Booking Assistant")
+
+def update_sidebar():
+    with st.sidebar:
+        st.header("Recent Bookings")
+        recent_bookings = get_recent_bookings(table_name)
+        if recent_bookings:
+            for booking in recent_bookings:
+                st.write("---")
+                txt = []
+                for key, value in booking.items():
+                    txt.append(f"**{key}:** {value}")
+                st.write('\n\n'.join(txt))
+        else:
+            st.write("No recent bookings found")
+
+        st.button("Clear Bookings", on_click=clear_bookings, args=(table_name,))
+
+
+def main():
+    st.write("Welcome to the Restaurant Booking Assistant. How can I help you?")
+    st.write("Enter your booking request below:")
+
+    query = st.text_input("Your request:", "Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2024.")
+
+    if st.button("Submit"):
+        with st.spinner('Processing your request...'):
+            answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
+            st.markdown(answer)
+    update_sidebar()
+
+
+
+if __name__ == '__main__':
+    main()
+
