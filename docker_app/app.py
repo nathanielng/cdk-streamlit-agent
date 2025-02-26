@@ -52,10 +52,19 @@ logging.basicConfig(level=logging.INFO)
 session_id = str(uuid.uuid1())
 logger.info(f"Session ID: {session_id}")
 
-# ----- SSM Setup -----
+iam_client = boto3.client('iam')
+bedrock_agent_client = boto3.client('bedrock-agent')
+bedrock_agent_runtime_client = boto3.client('bedrock-agent-runtime')
+s3_client = boto3.client('s3')
+
+
+# ----- SSM Parameter Setup -----
 ssm = boto3.client('ssm')
+agent_foundation_model = ssm.get_parameter(Name='/agents/AGENT_FOUNDATION_MODEL').get('Parameter').get('Value')
 agent_id = ssm.get_parameter(Name='/agents/AGENT_ID').get('Parameter').get('Value')
 alias_id = ssm.get_parameter(Name='/agents/ALIAS_ID').get('Parameter').get('Value')
+kb_id = ssm.get_parameter(Name='/agents/KB_ID').get('Parameter').get('Value')
+region = ssm.get_parameter(Name='/agents/REGION').get('Parameter').get('Value')
 
 lambda_iam_role = ssm.get_parameter(Name='/agents/LAMBDA_IAM_ROLE').get('Parameter').get('Value')
 lambda_iam_role = json.loads(lambda_iam_role)
@@ -63,21 +72,20 @@ lambda_iam_role = json.loads(lambda_iam_role)
 agent_role = ssm.get_parameter(Name='/agents/AGENT_ROLE').get('Parameter').get('Value')
 agent_role = json.loads(agent_role)
 
-# lambda_function = json.loads(lambda_function)
-# agent_action_group_response = json.loads(agent_action_group_response)
-# agent_functions = json.loads(agent_functions)
+table_name = ssm.get_parameter(Name='/agents/TABLE_NAME').get('Parameter').get('Value')
 
 # agent_name = ssm.get_parameter(Name='/agents/AGENT_NAME').get('Parameter').get('Value')
 # suffix = ssm.get_parameter(Name='/agents/SUFFIX').get('Parameter').get('Value')
-# region = ssm.get_parameter(Name='/agents/REGION').get('Parameter').get('Value')
-# agent_foundation_model = ssm.get_parameter(Name='/agents/AGENT_FOUNDATION_MODEL').get('Parameter').get('Value')
 # account_id = ssm.get_parameter(Name='/agents/ACCOUNT_ID').get('Parameter').get('Value')
 # alias_id = ssm.get_parameter(Name='/agents/ALIAS_ID').get('Parameter').get('Value')
 # lambda_function = ssm.get_parameter(Name='/agents/LAMBDA_FUNCTION').get('Parameter').get('Value')
 # lambda_function_name = ssm.get_parameter(Name='/agents/LAMBDA_FUNCTION_NAME').get('Parameter').get('Value')
 # agent_action_group_response = ssm.get_parameter(Name='/agents/AGENT_ACTION_GROUP_RESPONSE').get('Parameter').get('Value')
 # agent_functions = ssm.get_parameter(Name='/agents/AGENT_FUNCTIONS').get('Parameter').get('Value')
-table_name = ssm.get_parameter(Name='/agents/TABLE_NAME').get('Parameter').get('Value')
+
+# agent_action_group_response = json.loads(agent_action_group_response)
+# lambda_function = json.loads(lambda_function)
+# agent_functions = json.loads(agent_functions)
 
 
 # ----- DynamoDB -----
@@ -122,19 +130,67 @@ def update_sidebar():
         st.button("🗑️ Clear Bookings", on_click=clear_bookings, args=(table_name,))
 
 
-def main():
-    st.write("✍️ Enter your booking request")
+def tab_agent():
+    st.write("ℹ️ Enter a booking request with your name, number of people, date, and time, or ask a question about the menu")
+
+    st.markdown("**Examples**:\n- Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.\n- I want to delete the booking.\n- Could you get the details for the last booking created?\n- What do you have for kids that don't like fries?\n- I am allergic to shrimps. What can I eat at this restaurant?\n- What are the desserts on the adult menu?\n- ¿Podrías reservar una mesa para dos 25/07/2024 a las 19:30")
+
     query = st.text_area(
-        label="✨ Include your name, number of people, date, and time:",
+        label="✨ Enter your query below:",
         value="Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.",
         height=80
     )
 
-    if st.button("📤 Submit"):
+    if st.button("📤 Submit", key="booking_request"):
         with st.spinner('Processing your request...'):
             answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
             st.markdown(answer)
     update_sidebar()
+
+
+def tab_knowledgebase():
+    st.write("📝 Ask questions about the menu")
+
+    st.markdown("**Example questions**: Which are the 5 mains available in the childrens menu? What is in the children's menu? Which of those options are vegetarian?")
+ 
+    menu_query = st.text_area(
+        label="✨ Question",
+        value="What is in the children's menu?",
+        height=80,
+        key="menu_query"
+    )
+
+    if st.button("📤 Submit", key="kb_submit"):
+        with st.spinner('Processing your request...'):
+            response = bedrock_agent_runtime_client.retrieve_and_generate(
+            input={
+                "text": menu_query
+            },
+            retrieveAndGenerateConfiguration={
+                "type": "KNOWLEDGE_BASE",
+                "knowledgeBaseConfiguration": {
+                    'knowledgeBaseId': kb_id,
+                    "modelArn": "arn:aws:bedrock:{}::foundation-model/{}".format(region, agent_foundation_model),
+                    "retrievalConfiguration": {
+                        "vectorSearchConfiguration": {
+                            "numberOfResults":5
+                        } 
+                    }
+                }
+            }
+        )
+        answer = response['output']['text']
+        st.write(answer)
+
+
+def main():
+    tab1, tab2 = st.tabs(["Bookings & Menu Queries", "Menu"])
+
+    with tab1:
+        tab_agent()
+
+    with tab2:
+        tab_knowledgebase()
 
 
 
