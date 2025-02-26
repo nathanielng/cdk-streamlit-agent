@@ -1,8 +1,23 @@
-import streamlit as st
-import json
+#!/usr/bin/env python
+
+# export AWS_DEFAULT_REGION="us-east-1"
+# streamlit run agent_streamlit_app.py --server.runOnSave True --server.port 8501
+
+# curl -LO https://raw.githubusercontent.com/aws-samples/amazon-bedrock-workshop/refs/heads/main/05_Agents/agent.py
+# curl -LO https://raw.githubusercontent.com/nathanielng/cdk-streamlit-agent/refs/heads/main/docker_app/config_file.py
+
+# mkdir -p utils && cd utils
+# curl -LO https://raw.githubusercontent.com/nathanielng/cdk-streamlit-agent/refs/heads/main/docker_app/utils/auth.py
+
 import boto3
+import os
+import logging
+import json
+import uuid
+import streamlit as st
+
+from agent import invoke_agent_helper
 from utils.auth import Auth
-from utils.llm import Llm
 from config_file import Config
 
 # ID of Secrets Manager containing cognito parameters
@@ -28,21 +43,6 @@ with st.sidebar:
     st.text(f"Welcome,\n{authenticator.get_username()}")
     st.button("Logout", "logout_btn", on_click=logout)
 
-#!/usr/bin/env python
-
-# export AWS_DEFAULT_REGION="us-east-1"
-# streamlit run agent_streamlit_app.py --server.runOnSave True --server.port 8501
-
-# curl -LO https://raw.githubusercontent.com/aws-samples/amazon-bedrock-workshop/refs/heads/main/05_Agents/agent.py
-
-import boto3
-import os
-import logging
-import json
-import uuid
-import streamlit as st
-
-from agent import invoke_agent_helper
 
 # ----- Logging -----
 logger = logging.getLogger(__name__)
@@ -123,10 +123,12 @@ def update_sidebar():
 
 
 def main():
-    st.write("Welcome to the Restaurant Booking Assistant. How can I help you?")
-    st.write("Enter your booking request below:")
-
-    query = st.text_input("Your request:", "Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2024.")
+    st.write("Enter your booking request")
+    query = st.text_area(
+        label="Include your name, number of people, date, and time:",
+        value="Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.",
+        height=80
+    )
 
     if st.button("Submit"):
         with st.spinner('Processing your request...'):
@@ -138,4 +140,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
