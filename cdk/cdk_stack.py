@@ -134,6 +134,7 @@ class CdkStack(Stack):
                                         iam.PolicyStatement(
                                             actions=[
                                                 "bedrock:GetAsyncInvoke",
+                                                "bedrock:InvokeAgent",
                                                 "bedrock:InvokeModel",
                                                 "dynamodb:GetItem",
                                                 "dynamodb:PutItem",
