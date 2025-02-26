@@ -17,8 +17,9 @@ import uuid
 import streamlit as st
 
 from agent import invoke_agent_helper
-from utils.auth import Auth
 from config_file import Config
+from utils.auth import Auth
+from streamlit_pdf_viewer import pdf_viewer
 
 # ID of Secrets Manager containing cognito parameters
 secrets_manager_id = Config.SECRETS_MANAGER_ID
@@ -73,6 +74,7 @@ agent_role = ssm.get_parameter(Name='/agents/AGENT_ROLE').get('Parameter').get('
 agent_role = json.loads(agent_role)
 
 table_name = ssm.get_parameter(Name='/agents/TABLE_NAME').get('Parameter').get('Value')
+bucket_name = ssm.get_parameter(Name='/agents/BUCKET_NAME').get('Parameter').get('Value')
 
 # agent_name = ssm.get_parameter(Name='/agents/AGENT_NAME').get('Parameter').get('Value')
 # suffix = ssm.get_parameter(Name='/agents/SUFFIX').get('Parameter').get('Value')
@@ -159,6 +161,15 @@ def tab_agent():
     update_sidebar()
 
 
+def download_if_not_exists(bucket_name, filename):
+    if not os.path.isfile(filename):
+        s3_client.download_file(
+            bucket_name,
+            filename,
+            filename
+        )
+
+
 def tab_knowledgebase():
     st.write("📝 Ask questions about the menu")
 
@@ -192,6 +203,30 @@ def tab_knowledgebase():
         )
         answer = response['output']['text']
         st.write(answer)
+
+    download_if_not_exists(bucket_name, "Restaurant_Childrens_Menu.pdf")
+    download_if_not_exists(bucket_name, "Restaurant_Dinner_Menu.pdf")
+    download_if_not_exists(bucket_name, "Restaurant_week_specials.pdf")
+
+    menu_selection = st.selectbox(
+        label='Select a menu',
+        options = [
+            "Children's Menu",
+            "Dinner Menu",
+            "Week Specials"
+        ]
+    )
+
+    if menu_selection == "Children's Menu":
+        st.write("🍽️ **Children's Menu**")
+        pdf_viewer("Restaurant_Childrens_Menu.pdf")
+    elif menu_selection == "Dinner Menu":
+        st.write("🍽️ **Dinner Menu**")
+        pdf_viewer("Restaurant_Dinner_Menu.pdf")
+    elif menu_selection == "Week Specials":
+        st.write("🍽️ **Week Specials**")
+        pdf_viewer("Restaurant_week_specials.pdf")
+
 
 
 def main():
