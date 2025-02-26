@@ -115,6 +115,7 @@ st.title("🍽️ Restaurant Booking Assistant")
 
 def update_sidebar():
     with st.sidebar:
+        st.session_state.name = st.text_input(label='Name')
         st.header("📋 Recent Bookings")
         recent_bookings = get_recent_bookings(table_name)
         if recent_bookings:
@@ -133,7 +134,7 @@ def update_sidebar():
 def tab_agent():
     st.write("ℹ️ Enter a booking request with your name, number of people, date, and time, or ask a question about the menu")
 
-    st.markdown("**Examples**:\n- Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.\n- I want to delete the booking.\n- Could you get the details for the last booking created?\n- What do you have for kids that don't like fries?\n- I am allergic to shrimps. What can I eat at this restaurant?\n- What are the desserts on the adult menu?\n- ¿Podrías reservar una mesa para dos 25/07/2024 a las 19:30")
+    st.markdown("**Examples**:\n- Hi, I am Anna. I want to create a booking for 2 people, at 8pm on the 5th of May 2025.\n- I want to delete the booking.\n- Could you get the details for the last booking created?\n- What do you have for kids that don't like fries?\n- I am allergic to shrimps. What can I eat at this restaurant?\n- What are the desserts on the adult menu?\n- ¿Podrías reservar una mesa para dos 25/07/2025 a las 19:30")
 
     query = st.text_area(
         label="✨ Enter your query below:",
@@ -143,7 +144,17 @@ def tab_agent():
 
     if st.button("📤 Submit", key="booking_request"):
         with st.spinner('Processing your request...'):
-            answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
+            if 'name' in st.session_state:
+                if st.session_state.name:
+                    session_state = {
+                        "promptSessionAttributes": {
+                            "name": st.session_state.name
+                        }
+                    }
+                answer = invoke_agent_helper(query, session_id, agent_id, alias_id, session_state=session_state)
+            else:
+                answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
+                
             st.markdown(answer)
     update_sidebar()
 
