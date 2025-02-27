@@ -9,6 +9,7 @@
 # mkdir -p utils && cd utils
 # curl -LO https://raw.githubusercontent.com/nathanielng/cdk-streamlit-agent/refs/heads/main/docker_app/utils/auth.py
 
+import base64
 import boto3
 import os
 import logging
@@ -19,7 +20,6 @@ import streamlit as st
 from agent import invoke_agent_helper
 from config_file import Config
 from utils.auth import Auth
-from streamlit_pdf_viewer import pdf_viewer
 
 # ID of Secrets Manager containing cognito parameters
 secrets_manager_id = Config.SECRETS_MANAGER_ID
@@ -146,28 +146,43 @@ def tab_agent():
 
     if st.button("📤 Submit", key="booking_request"):
         with st.spinner('Processing your request...'):
-            if 'name' in st.session_state:
-                if st.session_state.name:
-                    session_state = {
-                        "promptSessionAttributes": {
-                            "name": st.session_state.name
-                        }
+            if st.session_state.name:
+                session_state = {
+                    "promptSessionAttributes": {
+                        "name": st.session_state.name
                     }
+                }
                 answer = invoke_agent_helper(query, session_id, agent_id, alias_id, session_state=session_state)
             else:
-                answer = invoke_agent_helper(query, session_id, agent_id, alias_id)
-                
+                answer = invoke_agent_helper(query, session_id, agent_id, alias_id)                
             st.markdown(answer)
     update_sidebar()
 
 
-def download_if_not_exists(bucket_name, filename):
-    if not os.path.isfile(filename):
-        s3_client.download_file(
-            bucket_name,
-            filename,
-            filename
-        )
+def download_if_not_exists(bucket_name, filename, folder=''):
+    localfilepath = os.path.join(folder, filename)
+    if not os.path.isfile(localfilepath):
+        try:
+            s3_client.download_file(
+                Bucket = bucket_name,
+                Key = filename,
+                Filename = localfilepath
+            )
+        except Exception as e:
+            st.error(f"Error downloading {filename} from s3://{bucket_name}: {e}")
+            return False
+    return True
+
+
+def display_pdf(filename, folder=''):
+    localfilepath = os.path.join(folder, filename)
+    if not os.path.isfile(localfilepath):
+        st.error(f"File {filename} not found")
+    else:
+        with open(localfilepath, "rb") as f:
+            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
+        st.markdown(pdf_display, unsafe_allow_html=True)
 
 
 def tab_knowledgebase():
@@ -204,29 +219,26 @@ def tab_knowledgebase():
         answer = response['output']['text']
         st.write(answer)
 
-    download_if_not_exists(bucket_name, "Restaurant_Childrens_Menu.pdf")
-    download_if_not_exists(bucket_name, "Restaurant_Dinner_Menu.pdf")
-    download_if_not_exists(bucket_name, "Restaurant_week_specials.pdf")
+    download_if_not_exists(bucket_name, "Restaurant_Childrens_Menu.pdf", folder="menu")
+    download_if_not_exists(bucket_name, "Restaurant_Dinner_Menu.pdf", folder="menu")
+    download_if_not_exists(bucket_name, "Restaurant_week_specials.pdf", folder="menu")
 
     menu_selection = st.selectbox(
         label='Select a menu',
         options = [
-            "Children's Menu",
-            "Dinner Menu",
-            "Week Specials"
+            "🍽️ Children's Menu",
+            "🍽️ Dinner Menu",
+            "🍽️ Week Specials"
         ]
     )
 
-    if menu_selection == "Children's Menu":
-        st.write("🍽️ **Children's Menu**")
-        pdf_viewer("Restaurant_Childrens_Menu.pdf")
-    elif menu_selection == "Dinner Menu":
-        st.write("🍽️ **Dinner Menu**")
-        pdf_viewer("Restaurant_Dinner_Menu.pdf")
-    elif menu_selection == "Week Specials":
-        st.write("🍽️ **Week Specials**")
-        pdf_viewer("Restaurant_week_specials.pdf")
-
+    if menu_selection == "🍽️ Children's Menu":
+        display_pdf("Restaurant_Childrens_Menu.pdf", folder='menu')
+    elif menu_selection == "🍽️ Dinner Menu":
+        display_pdf("Restaurant_Dinner_Menu.pdf", folder='menu')
+    elif menu_selection == "🍽️ Week Specials":
+        display_pdf("Restaurant_week_specials.pdf", folder='menu')
+ 
 
 
 def main():
@@ -241,4 +253,7 @@ def main():
 
 
 if __name__ == '__main__':
+    if 'name' not in st.session_state:
+        st.session_state.name = ''
+
     main()
