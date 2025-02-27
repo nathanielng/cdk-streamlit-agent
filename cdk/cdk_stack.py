@@ -137,6 +137,7 @@ class CdkStack(Stack):
                                                 "bedrock:InvokeAgent",
                                                 "bedrock:InvokeModel",
                                                 "bedrock:RetrieveAndGenerate",
+                                                "bedrock:Retrieve",
                                                 "dynamodb:DeleteItem",
                                                 "dynamodb:GetItem",
                                                 "dynamodb:PutItem",
