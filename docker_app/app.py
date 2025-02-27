@@ -21,6 +21,9 @@ from agent import invoke_agent_helper
 from config_file import Config
 from utils.auth import Auth
 
+# Set Streamlit to wide mode
+st.set_page_config(layout="wide")
+
 # ID of Secrets Manager containing cognito parameters
 secrets_manager_id = Config.SECRETS_MANAGER_ID
 
@@ -159,8 +162,8 @@ def tab_agent():
     update_sidebar()
 
 
-def download_if_not_exists(bucket_name, filename, folder=''):
-    localfilepath = os.path.join(folder, filename)
+def download_if_not_exists(bucket_name, filename):
+    localfilepath = filename
     if not os.path.isfile(localfilepath):
         try:
             s3_client.download_file(
@@ -169,13 +172,13 @@ def download_if_not_exists(bucket_name, filename, folder=''):
                 Filename = localfilepath
             )
         except Exception as e:
-            st.error(f"Error downloading {filename} from s3://{bucket_name}: {e}")
+            st.error(f"Error downloading {filename} from s3://{bucket_name}/{filename}: {e}")
             return False
     return True
 
 
-def display_pdf(filename, folder=''):
-    localfilepath = os.path.join(folder, filename)
+def display_pdf(filename):
+    localfilepath = filename
     if not os.path.isfile(localfilepath):
         st.error(f"File {filename} not found")
     else:
@@ -219,9 +222,9 @@ def tab_knowledgebase():
         answer = response['output']['text']
         st.write(answer)
 
-    download_if_not_exists(bucket_name, "Restaurant_Childrens_Menu.pdf", folder="menu")
-    download_if_not_exists(bucket_name, "Restaurant_Dinner_Menu.pdf", folder="menu")
-    download_if_not_exists(bucket_name, "Restaurant_week_specials.pdf", folder="menu")
+    download_if_not_exists(bucket_name, "Restaurant_Childrens_Menu.pdf")
+    download_if_not_exists(bucket_name, "Restaurant_Dinner_Menu.pdf")
+    download_if_not_exists(bucket_name, "Restaurant_week_specials.pdf")
 
     menu_selection = st.selectbox(
         label='Select a menu',
@@ -233,11 +236,11 @@ def tab_knowledgebase():
     )
 
     if menu_selection == "🍽️ Children's Menu":
-        display_pdf("Restaurant_Childrens_Menu.pdf", folder='menu')
+        display_pdf("Restaurant_Childrens_Menu.pdf")
     elif menu_selection == "🍽️ Dinner Menu":
-        display_pdf("Restaurant_Dinner_Menu.pdf", folder='menu')
+        display_pdf("Restaurant_Dinner_Menu.pdf")
     elif menu_selection == "🍽️ Week Specials":
-        display_pdf("Restaurant_week_specials.pdf", folder='menu')
+        display_pdf("Restaurant_week_specials.pdf")
  
 
 
